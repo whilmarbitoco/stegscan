@@ -98,13 +98,16 @@ def generate_spectrogram(data: bytes, output_path: str | None = None) -> str | N
     if output_path is None:
         output_path = os.path.join(tempfile.gettempdir(), "stegscan_spectrogram.png")
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 4))
-    ax.specgram(samples, Fs=sample_rate, NFFT=1024, noverlap=512)
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Frequency (Hz)")
-    ax.set_title("Spectrogram")
-    fig.savefig(output_path, dpi=100, bbox_inches="tight")
-    plt.close(fig)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="divide by zero")
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+        ax.specgram(samples, Fs=sample_rate, NFFT=1024, noverlap=512)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Frequency (Hz)")
+        ax.set_title("Spectrogram")
+        fig.savefig(output_path, dpi=100, bbox_inches="tight")
+        plt.close(fig)
 
     return output_path
 
@@ -138,7 +141,7 @@ def analyze_spectrogram(data: bytes) -> list[dict[str, Any]]:
                     "detections": detections,
                     "detail": f"QR code found in spectrogram: {qr_text[:200]}",
                 })
-        except ImportError:
+        except Exception:
             pass
 
         img_gray = img.convert("L")

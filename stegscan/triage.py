@@ -9,10 +9,21 @@ from stegscan.flagfinder.cascade import run_cascade
 from stegscan.flagfinder.detector import Detection, Detector
 
 
+def _progress(verbose: bool, fmt: str, *args: object) -> None:
+    if not verbose:
+        return
+    try:
+        import sys
+        print(f"[stegscan] {fmt.format(*args)}", file=sys.stderr, flush=True)
+    except Exception:
+        pass
+
+
 def triage(
     filepath: str,
     flag_regex: str | None = None,
     quiet: bool = True,
+    verbose: bool = False,
 ) -> list[dict]:
     fi = FileInfo.from_path(filepath)
     data = fi.data
@@ -21,7 +32,10 @@ def triage(
     detector = Detector(flag_regex=flag_regex)
     results: list[dict] = []
 
+    _progress(verbose, "Loaded {} bytes (mime={})", fi.size, mime)
+    _progress(verbose, "Running universal decode cascade...")
     detections = run_cascade(data, detector)
+    _progress(verbose, "Universal cascade done ({} detections)", len(detections))
     if detections:
         results.append({
             "module": "triage",
@@ -32,6 +46,7 @@ def triage(
         })
 
     try:
+        _progress(verbose, "Carving embedded files...")
         embedded = carve_embedded_files(data)
         if embedded:
             for emb in embedded:
@@ -50,6 +65,7 @@ def triage(
         pass
 
     try:
+        _progress(verbose, "Scanning unicode strings...")
         unicode_strings = all_unicode_strings(data)
         for ustr in unicode_strings:
             u_detections = detector.scan_bytes(ustr.encode("utf-8", errors="replace"))
@@ -65,6 +81,7 @@ def triage(
         pass
 
     try:
+        _progress(verbose, "Detecting polyglots...")
         polyglots = detect_polyglot(data)
         for pg in polyglots:
             detail = f"Polyglot: {pg.format}" if hasattr(pg, "format") else "Polyglot detected"
@@ -79,6 +96,7 @@ def triage(
         pass
 
     try:
+        _progress(verbose, "Reading metadata...")
         meta = all_metadata(str(fi.path))
         if meta:
             meta_bytes = str(meta).encode("utf-8", errors="replace")
@@ -94,6 +112,7 @@ def triage(
         pass
 
     if mime.startswith("image/png"):
+        _progress(verbose, "Analyzing PNG: LSB, bitplanes, channels, chunks...")
         try:
             from stegscan.image.png import analyze_png
             png_results = analyze_png(filepath, flag_regex, quiet)
@@ -104,6 +123,7 @@ def triage(
             pass
 
     if mime.startswith("image/jpeg"):
+        _progress(verbose, "Analyzing JPEG: COM markers, EXIF, bitplanes...")
         try:
             from stegscan.image.jpeg import analyze_jpeg
             jpeg_results = analyze_jpeg(filepath, flag_regex, quiet)
@@ -114,6 +134,7 @@ def triage(
             pass
 
     if mime in ("audio/wav", "audio/mpeg"):
+        _progress(verbose, "Analyzing audio: LSB extraction...")
         try:
             from stegscan.audio.lsb import extract_audio_lsb
             audio_raw = extract_audio_lsb(data)
@@ -129,6 +150,7 @@ def triage(
                     })
         except Exception:
             pass
+        _progress(verbose, "Analyzing audio: rendering spectrogram...")
         try:
             from stegscan.audio.spectrogram import analyze_spectrogram
             spec_results = analyze_spectrogram(data)
@@ -138,6 +160,7 @@ def triage(
                     results.append(r)
         except Exception:
             pass
+        _progress(verbose, "Analyzing audio: detecting DTMF tones...")
         try:
             from stegscan.audio.dtmf import detect_dtmf
             dtmf_results = detect_dtmf(data)
@@ -154,6 +177,7 @@ def triage(
             pass
 
     if mime.startswith("video/"):
+        _progress(verbose, "Analyzing video frames/metadata (ffmpeg)...")
         try:
             from stegscan.video.frames import analyze_video_frames
             video_results = analyze_video_frames(filepath, flag_regex, quiet)
@@ -162,6 +186,7 @@ def triage(
             pass
 
     if mime == "application/pdf":
+        _progress(verbose, "Analyzing PDF streams/objects...")
         try:
             from stegscan.document.pdf import analyze_pdf
             pdf_results = analyze_pdf(filepath, flag_regex, quiet)
@@ -169,4 +194,5 @@ def triage(
         except Exception:
             pass
 
+    _progress(verbose, "Triage complete: {} result groups", len(results))
     return results

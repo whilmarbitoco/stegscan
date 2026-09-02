@@ -21,10 +21,11 @@ class FlagMatch:
 
 
 DEFAULT_PATTERNS: list[FlagPattern] = [
+    FlagPattern(name="picoCTF", regex=r"\bpicoCTF\{[A-Za-z0-9_\-]+\}"),
     FlagPattern(name="flag", regex=r"\bflag\{[A-Za-z0-9_\-]+\}", flags=re.IGNORECASE),
     FlagPattern(name="ctf", regex=r"\bCTF\{[A-Za-z0-9_\-]+\}"),
-    FlagPattern(name="generic_braced", regex=r"\b[A-Za-z][A-Za-z0-9_\-]{2,19}\{[A-Za-z0-9_\-]+\}"),
-    FlagPattern(name="key", regex=r"\bkey\{.*?\}", flags=re.IGNORECASE),
+    FlagPattern(name="key", regex=r"\bkey\{[A-Za-z0-9_\-]+\}", flags=re.IGNORECASE),
+    FlagPattern(name="HTB", regex=r"\bHTB\{[A-Za-z0-9_\-]+\}"),
     FlagPattern(name="SK", regex=r"SK-.*?"),
     FlagPattern(name="flag_assign", regex=r"flag\s*=\s*[A-Za-z0-9_\-]+"),
     FlagPattern(name="key_assign", regex=r"key\s*=\s*[A-Za-z0-9_\-]+"),

@@ -53,6 +53,7 @@ def run_cascade(
     detector: Detector,
     max_depth: int = 4,
     xor_key_range: int = 256,
+    max_heavy_bytes: int = 262144,
 ) -> list[Detection]:
     all_detections: list[Detection] = []
     seen: dict[str, Detection] = {}
@@ -65,6 +66,13 @@ def run_cascade(
 
     direct = detector.scan_bytes(data)
     _add(direct)
+
+    # The recursive decode cascade and full XOR sweep are expensive and only
+    # make sense on small/high-signal payloads (embedded chunks, extracted LSB
+    # data, etc.). On large opaque files they spend minutes XOR-ing every byte
+    # of noise; direct detection above already catches plaintext/encoded flags.
+    if len(data) > max_heavy_bytes:
+        return sorted(all_detections, key=lambda d: d.confidence, reverse=True)
 
     def _explore(current: bytes, depth: int, path: list[str]) -> None:
         if depth >= max_depth:

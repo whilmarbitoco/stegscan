@@ -213,7 +213,22 @@ def _run_technique(filepath: str, technique: str, flag_regex: str | None, quiet:
     return []
 
 
+def _enable_ansi() -> None:
+    """Enable ANSI/VT escape-sequence processing on Windows consoles."""
+    import ctypes
+    if getattr(sys, "platform", "").startswith(("win", "cygwin")):
+        try:
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+            mode = ctypes.c_uint32()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(handle, mode.value | 0x0004)  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        except Exception:
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _enable_ansi()
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
@@ -232,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog=(
             "EXAMPLES\n"
             "  stegscan image.png             Scan a file using all techniques\n"
+            "  stegscan file.png -v          Scan with live progress messages\n"
             "  stegscan file.png -r 'FLAG{.*?}'   Only look for FLAG{...} text\n"
             "  stegscan file.png -t lsb       Only check the least-significant-bit trick\n"
             "  stegscan file.png -o out/      Save report.md and results.json to out/\n"
@@ -276,6 +292,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Only print the final results, without progress/discovery messages",
     )
     parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print live progress to stderr as each technique runs (helps on large files)",
+    )
+    parser.add_argument(
         "-o",
         "--output-dir",
         default=None,
@@ -308,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "-v",
+        "-V",
         "--version",
         action="version",
         version=f"stegscan {__version__}",
@@ -353,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
                 quiet=args.quiet,
                 output_dir=args.output_dir,
                 max_depth=args.depth,
+                verbose=args.verbose,
             )
             print(print_summary(result))
             return 0 if result.flags_found else 1

@@ -103,13 +103,14 @@ def scan(
     quiet: bool = True,
     output_dir: str | None = None,
     max_depth: int = 4,
+    verbose: bool = False,
 ) -> ScanResult:
     start = time.monotonic()
     errors: list[str] = []
     results: list[dict] = []
 
     try:
-        results = triage(filepath, flag_regex, quiet)
+        results = triage(filepath, flag_regex, quiet, verbose)
     except Exception as exc:
         errors.append(f"Triage error: {exc}")
 
@@ -148,36 +149,67 @@ def scan(
 
 def print_summary(result: ScanResult) -> str:
     try:
+        import io as _io
         from rich.console import Console
         from rich.table import Table
         from rich.text import Text
 
-        console = Console(file=io.StringIO(), record=True, width=100)
-        table = Table(title="StegScan Results", show_header=True, header_style="bold cyan")
-        table.add_column("Category", style="dim")
+        buf = _io.StringIO()
+        console = Console(
+            file=buf,
+            record=True,
+            width=100,
+            force_terminal=True,
+            color_system="truecolor",
+        )
+        table = Table(
+            title="[bold magenta]StegScan Results[/bold magenta]",
+            show_header=True,
+            header_style="bold cyan",
+            title_style="bold magenta",
+            border_style="cyan",
+        )
+        table.add_column("Category", style="bold white")
         table.add_column("Value")
 
-        table.add_row("File", result.filepath)
-        table.add_row("Scan time", f"{result.elapsed_seconds:.2f}s")
-        table.add_row("Total detections", str(result.total_detections))
-        table.add_row("Techniques applied", str(len(result.results)))
+        table.add_row("File", Text(result.filepath, style="bright_white"))
+        table.add_row(
+            "Scan time",
+            Text(f"{result.elapsed_seconds:.2f}s", style="bright_white"),
+        )
+        table.add_row(
+            "Total detections",
+            Text(str(result.total_detections), style="bright_white"),
+        )
+        table.add_row(
+            "Techniques applied",
+            Text(str(len(result.results)), style="bright_white"),
+        )
 
         if result.flags_found:
             for flag in result.flags_found:
-                text = Text(flag.flag, style="bold red")
-                table.add_row("FLAG", text)
+                style = "bold green" if flag.confidence >= 0.9 else "bold yellow"
+                flag_text = Text(f"FLAG: {flag.flag}", style=style)
+                flag_text.append(
+                    f"  (conf={flag.confidence:.2f}, {flag.source})",
+                    style="dim",
+                )
+                table.add_row("FLAG", flag_text)
         else:
-            table.add_row("Flags", Text("None found", style="yellow"))
+            table.add_row("FLAG", Text("None found", style="bold yellow"))
 
         type_counts: dict[str, int] = {}
         for r in result.results:
             rtype = r.get("type", "unknown")
             type_counts[rtype] = type_counts.get(rtype, 0) + 1
         for rtype, count in sorted(type_counts.items()):
-            table.add_row(f"  {rtype}", str(count))
+            table.add_row(f"  {rtype}", Text(str(count), style="bright_white"))
+
+        if result.errors:
+            table.add_row("Errors", Text("; ".join(result.errors), style="bold red"))
 
         console.print(table)
-        return console.export_text()
+        return buf.getvalue()
     except ImportError:
         lines: list[str] = []
         lines.append("=" * 60)
