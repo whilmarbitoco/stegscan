@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Build / tooling caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# stegscan runtime outputs
+scan_output/
+results.json
+report.md
+*.flag
+
+# IDE
+.idea/
+.vscode/
+
+# Unrelated large audio asset
+Wavyou2.wav
